@@ -7,7 +7,7 @@ module.exports = {
     publicPath: "/",
     path: path.resolve(__dirname, "./lib"),
     filename: "index.js",
-    library: "wujie",
+    library: "sh-wujie",
     libraryTarget: "umd",
     globalObject: "self",
     umdNamedDefine: true,

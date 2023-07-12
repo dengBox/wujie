@@ -105,6 +105,7 @@ export default class Wujie {
   public document: Document;
   /** 子应用styleSheet元素 */
   public styleSheetElements: Array<HTMLLinkElement | HTMLStyleElement>;
+  public bodyElements: Array<HTMLDivElement | Element>;
   /** 子应用head元素 */
   public head: HTMLHeadElement;
   /** 子应用body元素 */
@@ -392,6 +393,7 @@ export default class Wujie {
     this.provide = null;
     this.degradeAttrs = null;
     this.styleSheetElements = null;
+    this.bodyElements = null;
     this.bus = null;
     this.replace = null;
     this.fetch = null;
@@ -427,6 +429,11 @@ export default class Wujie {
     if (this.styleSheetElements && this.styleSheetElements.length) {
       this.styleSheetElements.forEach((styleSheetElement) => {
         rawElementAppendChild.call(this.degrade ? this.document.head : this.shadowRoot.head, styleSheetElement);
+      });
+    }
+    if (this.bodyElements && this.bodyElements.length) {
+      this.bodyElements.forEach((domElement) => {
+        rawElementAppendChild.call(this.degrade ? this.document.body : this.shadowRoot.body, domElement);
       });
     }
     this.patchCssRules();
@@ -488,6 +495,7 @@ export default class Wujie {
     this.degradeAttrs = degradeAttrs;
     this.provide = { bus: this.bus };
     this.styleSheetElements = [];
+    this.bodyElements = [];
     this.execQueue = [];
     this.lifecycles = lifecycles;
     this.plugins = getPlugins(plugins);
