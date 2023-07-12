@@ -1,5 +1,5 @@
 {
-  "name": "wujie",
+  "name": "shsc-wujie",
   "version": "1.0.19-beta",
   "description": "极致的微前端框架",
   "main": "./lib/index.js",
