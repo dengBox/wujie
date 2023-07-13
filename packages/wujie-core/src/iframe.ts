@@ -32,6 +32,7 @@ import {
   rawWindowAddEventListener,
   rawWindowRemoveEventListener,
 } from "./common";
+import type { appAddEventListenerOptions } from "./common";
 import { getJsLoader } from "./plugin";
 import { WUJIE_TIPS_SCRIPT_ERROR_REQUESTED, WUJIE_DATA_FLAG } from "./constant";
 import { ScriptObjectLoader } from "./index";
@@ -113,13 +114,14 @@ function patchIframeEvents(iframeWindow: Window) {
   iframeWindow.addEventListener = function addEventListener<K extends keyof WindowEventMap>(
     type: K,
     listener: (this: Window, ev: WindowEventMap[K]) => any,
-    options?: boolean | AddEventListenerOptions
+    options?: boolean | appAddEventListenerOptions
   ) {
     // 运行插件钩子函数
     execHooks(iframeWindow.__WUJIE.plugins, "windowAddEventListenerHook", iframeWindow, type, listener, options);
 
-    if (appWindowAddEventListenerEvents.includes(type)) {
-      return rawWindowAddEventListener.call(iframeWindow, type, listener, options);
+    if (appWindowAddEventListenerEvents.includes(type) || (typeof options === "object" && options.targetWindow)) {
+      const targetWindow = typeof options === "object" && options.targetWindow ? options?.targetWindow : iframeWindow;
+      return rawWindowAddEventListener.call(targetWindow, type, listener, options);
     }
     // 在子应用嵌套场景使用window.window获取真实window
     rawWindowAddEventListener.call(window.__WUJIE_RAW_WINDOW__ || window, type, listener, options);
@@ -128,13 +130,14 @@ function patchIframeEvents(iframeWindow: Window) {
   iframeWindow.removeEventListener = function removeEventListener<K extends keyof WindowEventMap>(
     type: K,
     listener: (this: Window, ev: WindowEventMap[K]) => any,
-    options?: boolean | AddEventListenerOptions
+    options?: boolean | appAddEventListenerOptions
   ) {
     // 运行插件钩子函数
     execHooks(iframeWindow.__WUJIE.plugins, "windowRemoveEventListenerHook", iframeWindow, type, listener, options);
 
-    if (appWindowAddEventListenerEvents.includes(type)) {
-      return rawWindowRemoveEventListener.call(iframeWindow, type, listener, options);
+    if (appWindowAddEventListenerEvents.includes(type) || (typeof options === "object" && options.targetWindow)) {
+      const targetWindow = typeof options === "object" && options.targetWindow ? options?.targetWindow : iframeWindow;
+      return rawWindowRemoveEventListener.call(targetWindow, type, listener, options);
     }
     rawWindowRemoveEventListener.call(window.__WUJIE_RAW_WINDOW__ || window, type, listener, options);
   };
@@ -186,7 +189,6 @@ function patchIframeHistory(iframeWindow: Window, appHostPath: string, mainHostP
 /**
  * 动态的修改iframe的base地址
  * @param iframeWindow
- * @param url
  * @param appHostPath
  * @param mainHostPath
  */
@@ -387,10 +389,11 @@ function patchDocumentEffect(iframeWindow: Window): void {
     handler: EventListenerOrEventListenerObject,
     options?: boolean | AddEventListenerOptions
   ): void {
+    if (!handler) return;
     let callback = handlerCallbackMap.get(handler);
     const typeList = handlerTypeMap.get(handler);
     // 设置 handlerCallbackMap
-    if (!callback && handler) {
+    if (!callback) {
       callback = typeof handler === "function" ? handler.bind(this) : handler;
       handlerCallbackMap.set(handler, callback);
     }
@@ -597,6 +600,9 @@ export function initBase(iframeWindow: Window, url: string): void {
 /**
  * 初始化iframe的dom结构
  * @param iframeWindow
+ * @param wujie
+ * @param mainHostPath
+ * @param appHostPath
  */
 function initIframeDom(iframeWindow: Window, wujie: WuJie, mainHostPath: string, appHostPath: string): void {
   const iframeDocument = iframeWindow.document;
@@ -631,7 +637,7 @@ function stopIframeLoading(iframeWindow: Window) {
   return new Promise<void>((resolve) => {
     function loop() {
       setTimeout(() => {
-        let newDoc = null;
+        let newDoc;
         try {
           newDoc = iframeWindow.document;
         } catch (err) {
@@ -766,7 +772,8 @@ export function insertScriptToIframe(
 /**
  * 加载iframe替换子应用
  * @param src 地址
- * @param shadowRoot
+ * @param element
+ * @param degradeAttrs
  */
 export function renderIframeReplaceApp(
   src: string,

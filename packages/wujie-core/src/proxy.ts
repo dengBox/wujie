@@ -61,6 +61,11 @@ export function proxyGenerator(
       if (p === "__WUJIE_RAW_DOCUMENT_QUERY_SELECTOR__" || p === "__WUJIE_RAW_DOCUMENT_QUERY_SELECTOR_ALL__") {
         return target[p];
       }
+      // https://262.ecma-international.org/8.0/#sec-proxy-object-internal-methods-and-internal-slots-get-p-receiver
+      const descriptor = Object.getOwnPropertyDescriptor(target, p);
+      if (descriptor?.configurable === false && descriptor?.writable === false) {
+        return target[p];
+      }
       // 修正this指针指向
       return getTargetValue(target, p);
     },
@@ -118,7 +123,19 @@ export function proxyGenerator(
               }
               if (propKey === "getElementsByClassName") arg = "." + arg;
               if (propKey === "getElementsByName") arg = `[name="${arg}"]`;
-              return querySelectorAll.call(shadowRoot, arg);
+
+              // FIXME: This string must be a valid CSS selector string; if it's not, a SyntaxError exception is thrown;
+              // so we should ensure that the program can execute normally in case of exceptions.
+              // reference: https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll
+
+              let res: NodeList[] | [];
+              try {
+                res = querySelectorAll.call(shadowRoot, arg);
+              } catch (error) {
+                res = [];
+              }
+
+              return res;
             },
           });
         }

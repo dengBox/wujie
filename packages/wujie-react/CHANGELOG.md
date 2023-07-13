@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.18](https://github.com/Tencent/wujie/compare/v1.0.17...v1.0.18) (2023-07-11)
+
+### Bug Fixes
+
+* 修复wujie-react偶现无法加载子应用元素 ([#599](https://github.com/Tencent/wujie/issues/599)) ([f927505](https://github.com/Tencent/wujie/commit/f92750529a06615c44c5e765bb6b5ceaac68f4e0))
+
+## [1.0.17](https://github.com/Tencent/wujie/compare/v1.0.16...v1.0.17) (2023-05-30)
+
+**Note:** Version bump only for package wujie-react
+
+## [1.0.16](https://github.com/Tencent/wujie/compare/v1.0.15...v1.0.16) (2023-05-17)
+
+**Note:** Version bump only for package wujie-react
+
+## [1.0.15](https://github.com/Tencent/wujie/compare/v1.0.14...v1.0.15) (2023-05-04)
+
+### Features
+
+* 修改umd暴露模块 ([0c4e434](https://github.com/Tencent/wujie/commit/0c4e4341bb2db904532d387ac7080c396e4df001))
+
 ## [1.0.14](https://github.com/Tencent/wujie/compare/v1.0.13...v1.0.14) (2023-03-31)
 
 **Note:** Version bump only for package wujie-react

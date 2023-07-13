@@ -5,6 +5,8 @@ export interface SandboxCache {
   options?: cacheOptions;
 }
 
+export type appAddEventListenerOptions = AddEventListenerOptions & { targetWindow?: Window };
+
 // 全部无界实例和配置存储map
 export const idToSandboxCacheMap = window.__POWERED_BY_WUJIE__
   ? window.__WUJIE.inject.idToSandboxMap
@@ -109,6 +111,7 @@ export const documentProxyProperties = {
   // 需要从主应用document中获取的方法
   documentMethods: [
     "execCommand",
+    "caretPositionFromPoint",
     "createRange",
     "exitFullscreen",
     "exitPictureInPicture",
@@ -163,6 +166,9 @@ export const appWindowAddEventListenerEvents = [
   "load",
   "beforeunload",
   "unload",
+  "message",
+  "error",
+  "unhandledrejection",
 ];
 
 // 子应用window.onXXX需要挂载到iframe沙箱上的事件
