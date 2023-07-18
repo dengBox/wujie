@@ -116,9 +116,12 @@ async function processCssLoaderForTemplate(sandbox: Wujie, html: HTMLHtmlElement
 
   return await Promise.all([
     Promise.all(
-      getExternalStyleSheets(cssBeforeLoaders, sandbox.fetch, sandbox.lifecycles.loadError).map(
-        ({ src, contentPromise }) => contentPromise.then((content) => ({ src, content }))
-      )
+      getExternalStyleSheets(
+        sandbox.iframe.contentWindow,
+        cssBeforeLoaders,
+        sandbox.fetch,
+        sandbox.lifecycles.loadError
+      ).map(({ src, contentPromise }) => contentPromise.then((content) => ({ src, content })))
     ).then((contentList) => {
       contentList.forEach(({ src, content }) => {
         if (!content) return;
@@ -131,9 +134,12 @@ async function processCssLoaderForTemplate(sandbox: Wujie, html: HTMLHtmlElement
       });
     }),
     Promise.all(
-      getExternalStyleSheets(cssAfterLoaders, sandbox.fetch, sandbox.lifecycles.loadError).map(
-        ({ src, contentPromise }) => contentPromise.then((content) => ({ src, content }))
-      )
+      getExternalStyleSheets(
+        sandbox.iframe.contentWindow,
+        cssAfterLoaders,
+        sandbox.fetch,
+        sandbox.lifecycles.loadError
+      ).map(({ src, contentPromise }) => contentPromise.then((content) => ({ src, content })))
     ).then((contentList) => {
       contentList.forEach(({ src, content }) => {
         if (!content) return;

@@ -196,6 +196,7 @@ function rewriteAppendOrInsertChild(opts: {
           // 排除css
           if (href && !isMatchUrl(href, getEffectLoaders("cssExcludes", plugins))) {
             getExternalStyleSheets(
+              iframe.contentWindow,
               [{ src: href, ignore: isMatchUrl(href, getEffectLoaders("cssIgnores", plugins)) }],
               fetch,
               lifecycles.loadError
@@ -276,7 +277,13 @@ function rewriteAppendOrInsertChild(opts: {
               ignore: isMatchUrl(src, getEffectLoaders("jsIgnores", plugins)),
               attrs: parseTagAttributes(element.outerHTML),
             } as ScriptObject;
-            getExternalScripts([scriptOptions], fetch, lifecycles.loadError, fiber).forEach((scriptResult) => {
+            getExternalScripts(
+              sandbox.iframe.contentWindow,
+              [scriptOptions],
+              fetch,
+              lifecycles.loadError,
+              fiber
+            ).forEach((scriptResult) => {
               dynamicScriptExecStack = dynamicScriptExecStack.then(() =>
                 scriptResult.contentPromise.then(
                   (content) => {
