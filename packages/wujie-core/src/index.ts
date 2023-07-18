@@ -87,7 +87,7 @@ type eventListenerHook = (
   options?: boolean | AddEventListenerOptions
 ) => void;
 
-export type loadErrorHandler = (url: string, e: Error) => any;
+export type loadErrorHandler = (appWindow: Window, url: string, e: Error) => any;
 
 type baseOptions = {
   /** 唯一性用户必须保证 */
@@ -224,6 +224,7 @@ export async function startApp(startOptions: startOptions): Promise<Function | v
           url,
           html,
           opts: {
+            appWindow: sandbox.iframe.contentWindow,
             fetch: fetch || window.fetch,
             plugins: sandbox.plugins,
             loadError: sandbox.lifecycles.loadError,
@@ -263,6 +264,7 @@ export async function startApp(startOptions: startOptions): Promise<Function | v
     url,
     html,
     opts: {
+      appWindow: newSandbox.iframe.contentWindow,
       fetch: fetch || window.fetch,
       plugins: newSandbox.plugins,
       loadError: newSandbox.lifecycles.loadError,
@@ -315,6 +317,7 @@ export function preloadApp(preOptions: preOptions): void {
         url,
         html,
         opts: {
+          appWindow: sandbox.iframe.contentWindow,
           fetch: fetch || window.fetch,
           plugins: sandbox.plugins,
           loadError: sandbox.lifecycles.loadError,
