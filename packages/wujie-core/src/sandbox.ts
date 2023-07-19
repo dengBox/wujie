@@ -383,7 +383,7 @@ export default class Wujie {
   }
 
   /** 销毁子应用 */
-  public destroy(disClear?: boolean) {
+  public destroy() {
     this.bus.$clear();
     this.shadowRoot = null;
     this.proxy = null;
@@ -419,9 +419,7 @@ export default class Wujie {
     if (this.iframe) {
       this.iframe.parentNode?.removeChild(this.iframe);
     }
-    if (!disClear) {
-      deleteWujieById(this.id);
-    }
+    deleteWujieById(this.id);
   }
 
   /** 当子应用再次激活后，只运行mount函数，样式需要重新恢复 */
