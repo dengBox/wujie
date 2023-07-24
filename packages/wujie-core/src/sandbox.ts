@@ -130,6 +130,7 @@ export default class Wujie {
     appEventObjMap: Map<String, EventObj>;
     mainHostPath: string;
   };
+  clearCatch: () => void;
 
   /** 激活子应用
    * 1、同步路由
@@ -420,6 +421,8 @@ export default class Wujie {
       this.iframe.parentNode?.removeChild(this.iframe);
     }
     deleteWujieById(this.id);
+    // 销毁子系统静态资源
+    // this.clearCatch();
   }
 
   /** 当子应用再次激活后，只运行mount函数，样式需要重新恢复 */

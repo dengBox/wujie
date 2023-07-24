@@ -1,4 +1,4 @@
-import importHTML, { processCssLoader } from "./entry";
+import importHTML, { processCssLoader, styleCache, scriptCache, embedHTMLCache } from "./entry";
 import { StyleObject, ScriptAttributes } from "./template";
 import WuJie, { lifecycle } from "./sandbox";
 import { defineWujieWebComponent, addLoading } from "./shadow";
@@ -16,6 +16,12 @@ import {
 import { getWujieById, getOptionsById, addSandboxCacheWithOptions } from "./common";
 import { EventBus } from "./event";
 import { WUJIE_TIPS_NOT_SUPPORTED } from "./constant";
+
+export const clearAllCatch = () => {
+  Object.keys(styleCache).forEach((k) => delete styleCache[k]);
+  Object.keys(scriptCache).forEach((k) => delete scriptCache[k]);
+  Object.keys(embedHTMLCache).forEach((k) => delete embedHTMLCache[k]);
+};
 
 export const bus = new EventBus(Date.now().toString());
 
@@ -271,6 +277,31 @@ export async function startApp(startOptions: startOptions): Promise<Function | v
       fiber,
     },
   });
+  // newSandbox.clearCatch = () => {
+  //   const currentScripts = getExternalScripts();
+  //   const currentStyles = getExternalStyleSheets();
+  //   // 清除html缓存
+  //   for (const h in embedHTMLCache) {
+  //     if (h === url) {
+  //       delete embedHTMLCache[h];
+  //       break;
+  //     }
+  //   }
+  //   // 清除js缓存
+  //   for (const j of currentScripts) {
+  //     const js = Object.keys(scriptCache).find((s) => s === j?.src);
+  //     if (js) {
+  //       delete scriptCache[j.src];
+  //     }
+  //   }
+  //   // 清除css缓存
+  //   for (const c of currentStyles) {
+  //     const css = Object.keys(styleCache).find((s) => s === c?.src);
+  //     if (css) {
+  //       delete styleCache[c.src];
+  //     }
+  //   }
+  // };
 
   const processedHtml = await processCssLoader(newSandbox, template, getExternalStyleSheets);
   await newSandbox.active({ url, sync, prefix, template: processedHtml, el, props, alive, fetch, replace });

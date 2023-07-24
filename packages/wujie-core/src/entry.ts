@@ -37,9 +37,9 @@ type ImportEntryOpts = {
   loadError?: loadErrorHandler;
 };
 
-const styleCache = {};
-const scriptCache = {};
-const embedHTMLCache = {};
+export const styleCache = {};
+export const scriptCache = {};
+export const embedHTMLCache = {};
 
 if (!window.fetch) {
   error(WUJIE_TIPS_NO_FETCH);
