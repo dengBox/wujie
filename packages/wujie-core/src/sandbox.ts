@@ -384,7 +384,7 @@ export default class Wujie {
   }
 
   /** 销毁子应用 */
-  public destroy() {
+  public destroy(disClear?: boolean) {
     this.bus.$clear();
     this.shadowRoot = null;
     this.proxy = null;
@@ -420,7 +420,9 @@ export default class Wujie {
     if (this.iframe) {
       this.iframe.parentNode?.removeChild(this.iframe);
     }
-    deleteWujieById(this.id);
+    if (!disClear) {
+      deleteWujieById(this.id);
+    }
     // 销毁子系统静态资源
     // this.clearCatch();
   }
