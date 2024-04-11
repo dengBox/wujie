@@ -61,6 +61,8 @@ declare global {
     __WUJIE_RAW_WINDOW__: Window;
     // 子应用沙盒实例
     __WUJIE: WuJie;
+    // 记录注册在主应用中的事件
+    __WUJIE_EVENTLISTENER__: Set<{ listener: EventListenerOrEventListenerObject; type: string; options: any }>;
     // 子应用mount函数
     __WUJIE_MOUNT: () => void;
     // 子应用unmount函数
@@ -111,6 +113,7 @@ declare global {
  * 修改window对象的事件监听，只有路由事件采用iframe的事件
  */
 function patchIframeEvents(iframeWindow: Window) {
+  iframeWindow.__WUJIE_EVENTLISTENER__ = iframeWindow.__WUJIE_EVENTLISTENER__ || new Set();
   iframeWindow.addEventListener = function addEventListener<K extends keyof WindowEventMap>(
     type: K,
     listener: (this: Window, ev: WindowEventMap[K]) => any,
@@ -118,7 +121,8 @@ function patchIframeEvents(iframeWindow: Window) {
   ) {
     // 运行插件钩子函数
     execHooks(iframeWindow.__WUJIE.plugins, "windowAddEventListenerHook", iframeWindow, type, listener, options);
-
+    // 相同参数多次调用 addEventListener 不会导致重复注册，所以用set。
+    iframeWindow.__WUJIE_EVENTLISTENER__.add({ type, listener, options });
     if (appWindowAddEventListenerEvents.includes(type) || (typeof options === "object" && options.targetWindow)) {
       const targetWindow = typeof options === "object" && options.targetWindow ? options?.targetWindow : iframeWindow;
       return rawWindowAddEventListener.call(targetWindow, type, listener, options);
@@ -134,7 +138,12 @@ function patchIframeEvents(iframeWindow: Window) {
   ) {
     // 运行插件钩子函数
     execHooks(iframeWindow.__WUJIE.plugins, "windowRemoveEventListenerHook", iframeWindow, type, listener, options);
-
+    iframeWindow.__WUJIE_EVENTLISTENER__.forEach((o) => {
+      // 这里严格一点，确保子应用销毁的时候都能销毁
+      if (o.listener === listener && o.type === type && options == o.options) {
+        iframeWindow.__WUJIE_EVENTLISTENER__.delete(o);
+      }
+    });
     if (appWindowAddEventListenerEvents.includes(type) || (typeof options === "object" && options.targetWindow)) {
       const targetWindow = typeof options === "object" && options.targetWindow ? options?.targetWindow : iframeWindow;
       return rawWindowRemoveEventListener.call(targetWindow, type, listener, options);
@@ -284,7 +293,7 @@ function recordEventListeners(iframeWindow: Window) {
     // 添加事件缓存
     const elementListenerList = sandbox.elementEventCacheMap.get(this);
     if (elementListenerList) {
-      if (!elementListenerList.find((listener) => listener.handler === handler)) {
+      if (!elementListenerList.find((listener) => listener.type === type && listener.handler === handler)) {
         elementListenerList.push({ type, handler, options });
       }
     } else sandbox.elementEventCacheMap.set(this, [{ type, handler, options }]);
@@ -299,7 +308,7 @@ function recordEventListeners(iframeWindow: Window) {
     // 清除缓存
     const elementListenerList = sandbox.elementEventCacheMap.get(this);
     if (elementListenerList) {
-      const index = elementListenerList?.findIndex((ele) => ele.handler === handler);
+      const index = elementListenerList?.findIndex((ele) => ele.type === type && ele.handler === handler);
       elementListenerList.splice(index, 1);
     }
     if (!elementListenerList?.length) {
@@ -662,18 +671,22 @@ export function patchElementEffect(
 ): void {
   const proxyLocation = iframeWindow.__WUJIE.proxyLocation as Location;
   if (element._hasPatch) return;
-  Object.defineProperties(element, {
-    baseURI: {
-      configurable: true,
-      get: () => proxyLocation.protocol + "//" + proxyLocation.host + proxyLocation.pathname,
-      set: undefined,
-    },
-    ownerDocument: {
-      configurable: true,
-      get: () => iframeWindow.document,
-    },
-    _hasPatch: { get: () => true },
-  });
+  try {
+    Object.defineProperties(element, {
+      baseURI: {
+        configurable: true,
+        get: () => proxyLocation.protocol + "//" + proxyLocation.host + proxyLocation.pathname,
+        set: undefined,
+      },
+      ownerDocument: {
+        configurable: true,
+        get: () => iframeWindow.document,
+      },
+      _hasPatch: { get: () => true },
+    });
+  } catch (error) {
+    console.warn(error);
+  }
   execHooks(iframeWindow.__WUJIE.plugins, "patchElementHook", element, iframeWindow);
 }
 
@@ -729,7 +742,11 @@ export function insertScriptToIframe(
     // 部分浏览器 src 不可配置 取不到descriptor表示无该属性，可写
     if (descriptor?.configurable || !descriptor) {
       // 解决 webpack publicPath 为 auto 无法加载资源的问题
-      Object.defineProperty(scriptElement, "src", { get: () => src || "" });
+      try {
+        Object.defineProperty(scriptElement, "src", { get: () => src || "" });
+      } catch (error) {
+        console.warn(error);
+      }
     }
   } else {
     src && scriptElement.setAttribute("src", src);
