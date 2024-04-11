@@ -251,9 +251,8 @@ export default class Wujie {
    * 2、处理兼容样式
    */
   public async start(getExternalScripts: () => ScriptResultList): Promise<void> {
-    this.execFlag = true;
     // 执行脚本
-    const scriptResultList = await getExternalScripts();
+    const scriptResultList = getExternalScripts();
     // 假如已经被销毁了
     if (!this.iframe) return;
     const iframeWindow = this.iframe.contentWindow;
@@ -286,6 +285,7 @@ export default class Wujie {
 
     // 同步代码
     syncScriptResultList.concat(deferScriptResultList).forEach((scriptResult) => {
+      // 在执行队列的时候，需要监听iframe-appendChild回调，动态更新this.execQueue数组以保证执行顺序。
       this.execQueue.push(() =>
         scriptResult.contentPromise.then((content) =>
           this.fiber
@@ -340,6 +340,7 @@ export default class Wujie {
       this.execQueue.push(() => {
         resolve();
         this.execQueue.shift()?.();
+        this.execFlag = true;
       });
     });
   }
@@ -428,6 +429,10 @@ export default class Wujie {
     // 清除 iframe 沙箱
     if (this.iframe) {
       const iframeWindow = this.iframe.contentWindow;
+      if (isFunction(iframeWindow.__WUJIE_DESTROY)) {
+        // 清除子系统运行时副作用
+        iframeWindow.__WUJIE_DESTROY();
+      }
       if (iframeWindow?.__WUJIE_EVENTLISTENER__) {
         iframeWindow.__WUJIE_EVENTLISTENER__.forEach((o) => {
           iframeWindow.removeEventListener(o.type, o.listener, o.options);

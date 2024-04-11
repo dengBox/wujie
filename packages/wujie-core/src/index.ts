@@ -360,7 +360,7 @@ export function preloadApp(preOptions: preOptions): void {
       if (exec) {
         await sandbox.start(getExternalScripts);
       } else {
-        await getExternalScripts();
+        getExternalScripts();
       }
     };
     sandbox.preload = runPreload();

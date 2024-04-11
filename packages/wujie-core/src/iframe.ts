@@ -67,6 +67,8 @@ declare global {
     __WUJIE_MOUNT: () => void;
     // 子应用unmount函数
     __WUJIE_UNMOUNT: () => void;
+    // 子应用destroy函数
+    __WUJIE_DESTROY: () => void;
     // document type
     Document: typeof Document;
     // img type
@@ -757,7 +759,7 @@ export function insertScriptToIframe(
   nextScriptElement.textContent =
     "if(window.__WUJIE.execQueue && window.__WUJIE.execQueue.length){ window.__WUJIE.execQueue.shift()()}";
 
-  const container = rawDocumentQuerySelector.call(iframeWindow.document, "head");
+  const container = rawDocumentQuerySelector.call(iframeWindow.document, "body");
   const execNextScript = () => !async && container.appendChild(nextScriptElement);
   const afterExecScript = () => {
     onload?.();
