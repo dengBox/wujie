@@ -87,6 +87,8 @@ export default class Wujie {
   public execQueue: Array<Function>;
   /** 子应用执行过标志 */
   public execFlag: boolean;
+  /** 子应用未激活时脚本插入顺序 */
+  public scriptInsertIndex: number;
   /** 子应用激活标志 */
   public activeFlag: boolean;
   /** 子应用mount标志 */
@@ -249,6 +251,7 @@ export default class Wujie {
    * 2、处理兼容样式
    */
   public async start(getExternalScripts: () => ScriptResultList): Promise<void> {
+    this.scriptInsertIndex = -1;
     // 执行脚本
     const scriptResultList = await getExternalScripts();
     // 假如已经被销毁了
@@ -405,6 +408,7 @@ export default class Wujie {
     this.replace = null;
     this.fetch = null;
     this.execFlag = null;
+    this.scriptInsertIndex = -1;
     this.mountFlag = null;
     this.hrefFlag = null;
     this.document = null;
