@@ -9,6 +9,7 @@
   "compilerOptions": {
     "outDir": "./esm",
     "rootDir": "./src",
+    "target": "ESNext",
     /* 额外的检查 */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

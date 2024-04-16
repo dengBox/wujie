@@ -288,7 +288,6 @@ export default class Wujie {
 
     // 同步代码
     syncScriptResultList.concat(deferScriptResultList).forEach((scriptResult) => {
-      // 在执行队列的时候，需要监听iframe-appendChild回调，动态更新this.execQueue数组以保证执行顺序。
       this.execQueue.push(() =>
         scriptResult.contentPromise.then((content) =>
           this.fiber
@@ -448,8 +447,6 @@ export default class Wujie {
     if (!disClear) {
       deleteWujieById(this.id);
     }
-    // 销毁子系统静态资源
-    // this.clearCatch();
   }
 
   /** 当子应用再次激活后，只运行mount函数，样式需要重新恢复 */
