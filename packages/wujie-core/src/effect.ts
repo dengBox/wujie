@@ -154,7 +154,6 @@ function patchStylesheetElement(
   });
 }
 
-let dynamicScriptExecStack = Promise.resolve();
 function rewriteAppendOrInsertChild(opts: {
   rawDOMAppendOrInsertBefore: <T extends Node>(newChild: T, refChild?: Node | null) => T;
   wujieId: string;
@@ -285,37 +284,36 @@ function rewriteAppendOrInsertChild(opts: {
               lifecycles.loadError,
               fiber
             ).forEach((scriptResult) => {
-              dynamicScriptExecStack = dynamicScriptExecStack.then(() =>
-                scriptResult.contentPromise.then(
-                  (content) => {
-                    if (sandbox.execQueue === null) return warn(WUJIE_TIPS_REPEAT_RENDER);
-                    const execQueueLength = sandbox.execQueue?.length;
-                    /**
-                     * 插入脚本有可能是因为初始化子系统时的动态脚本请求形成的
-                     * 所以execQueue序列需要根据execFlag，决定push到头部，或者是push到尾部
-                     */
-                    const fn = () =>
-                      fiber
-                        ? sandbox.requestIdleCallback(() => {
-                            execScript({ ...scriptResult, content });
-                          })
-                        : execScript({ ...scriptResult, content });
-                    if (!sandbox.execFlag) {
-                      sandbox.execQueue.unshift(fn);
-                      sandbox.execQueue.shift()();
-                    } else {
-                      sandbox.execQueue.push(fn);
-                    }
+              if (sandbox.execQueue === null) return warn(WUJIE_TIPS_REPEAT_RENDER);
+              const execQueueLength = sandbox.execQueue?.length;
+              /**
+               * 插入脚本有可能是因为初始化子系统时的动态脚本请求形成的
+               * 所以execQueue序列需要根据execFlag，决定push到头部，或者是push到尾部
+               */
+              const fn = async () => {
+                try {
+                  const content = await scriptResult.contentPromise;
+                  // 如果没有执行初始化完毕，setTimeout会把序列打乱
+                  fiber && sandbox.execFlag
+                    ? sandbox.requestIdleCallback(() => {
+                        execScript({ ...scriptResult, content });
+                      })
+                    : execScript({ ...scriptResult, content });
+                } catch {
+                  manualInvokeElementEvent(element, "error");
+                  element = null;
+                }
+              };
 
-                    // 同步脚本如果都执行完了，需要手动触发执行
-                    if (!execQueueLength) sandbox.execQueue.shift()();
-                  },
-                  () => {
-                    manualInvokeElementEvent(element, "error");
-                    element = null;
-                  }
-                )
-              );
+              if (!sandbox.execFlag) {
+                // sandbox.execQueue.unshift(fn);
+                sandbox.scriptInsertIndex++;
+                sandbox.execQueue.splice(sandbox.scriptInsertIndex, 0, fn);
+              } else {
+                sandbox.execQueue.push(fn);
+              }
+              // 同步脚本如果都执行完了，需要手动触发执行
+              if (!execQueueLength) sandbox.execQueue.shift()();
             });
           } else {
             const execQueueLength = sandbox.execQueue?.length;
