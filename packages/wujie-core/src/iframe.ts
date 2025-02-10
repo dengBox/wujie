@@ -7,6 +7,7 @@ import {
   isConstructable,
   anchorElementGenerator,
   isMatchSyncQueryById,
+  isFunction,
   warn,
   error,
   execHooks,
@@ -66,7 +67,7 @@ declare global {
     // 子应用mount函数
     __WUJIE_MOUNT: () => void;
     // 子应用unmount函数
-    __WUJIE_UNMOUNT: () => void;
+    __WUJIE_UNMOUNT: () => void | Promise<void>;
     // document type
     Document: typeof Document;
     // img type
@@ -524,16 +525,29 @@ function patchDocumentEffect(iframeWindow: Window): void {
       enumerable: true,
       writable: true,
     };
+    //get里获取属性值，set里直接对iframeWindow.document[propKey]赋值，下一个handler绑在iframeWindow.document[propKey]之前需要对之前的handler解绑
     try {
       Object.defineProperty(iframeWindow.Document.prototype, propKey, {
         enumerable: descriptor.enumerable,
         configurable: true,
         get: () => (sandbox.degrade ? sandbox : window).document[propKey],
+        // 在设置新的handler之前先移除之前的回调
         set:
           descriptor.writable || descriptor.set
             ? (handler) => {
-                (sandbox.degrade ? sandbox : window).document[propKey] =
-                  typeof handler === "function" ? handler.bind(iframeWindow.document) : handler;
+                // (sandbox.degrade ? sandbox : window).document[propKey] =
+                //   typeof handler === "function" ? handler.bind(iframeWindow.document) : handler;
+                (sandbox.degrade ? sandbox : window).document.removeEventListener(
+                  propKey,
+                  handlerCallbackMap.get(handler)
+                );
+                // 绑定新回调函数
+                (sandbox.degrade ? sandbox : window).document.addEventListener(
+                  propKey,
+                  typeof handler === "function" ? handler.bind(iframeWindow.document) : handler
+                );
+                // 更新回调函数的映射
+                handlerCallbackMap.set(handler, handler.bind(iframeWindow.document));
               }
             : undefined,
       });
@@ -564,6 +578,7 @@ function patchNodeEffect(iframeWindow: Window): void {
   const rawGetRootNode = iframeWindow.Node.prototype.getRootNode;
   const rawAppendChild = iframeWindow.Node.prototype.appendChild;
   const rawInsertRule = iframeWindow.Node.prototype.insertBefore;
+  const rawRemoveChild = iframeWindow.Node.prototype.removeChild;
   iframeWindow.Node.prototype.getRootNode = function (options?: GetRootNodeOptions): Node {
     const rootNode = rawGetRootNode.call(this, options);
     if (rootNode === iframeWindow.__WUJIE.shadowRoot) return iframeWindow.document;
@@ -576,6 +591,21 @@ function patchNodeEffect(iframeWindow: Window): void {
   };
   iframeWindow.Node.prototype.insertBefore = function <T extends Node>(node: T, child: Node | null): T {
     const res = rawInsertRule.call(this, node, child);
+    patchElementEffect(node, iframeWindow);
+    return res;
+  };
+  iframeWindow.Node.prototype.removeChild = function <T extends Node>(node: T): T {
+    let res;
+    try {
+      res = rawRemoveChild.call(this, node);
+    } catch (e) {
+      console.warn(
+        `Failed to removeChild: ${node.nodeName.toLowerCase()} is not a child of ${this.nodeName.toLowerCase()}, try again with parentNode attribute. `
+      );
+      if (node.isConnected && isFunction(node.parentNode?.removeChild)) {
+        node.parentNode.removeChild(node);
+      }
+    }
     patchElementEffect(node, iframeWindow);
     return res;
   };
@@ -641,12 +671,13 @@ function initIframeDom(iframeWindow: Window, wujie: WuJie, mainHostPath: string,
  * 防止运行主应用的js代码，给子应用带来很多副作用
  */
 // TODO 更加准确抓取停止时机
-function stopIframeLoading(iframeWindow: Window) {
+function stopIframeLoading(iframe: HTMLIFrameElement, useObjectURL: { mainHostPath: string } | false) {
+  const iframeWindow = iframe.contentWindow;
   const oldDoc = iframeWindow.document;
   return new Promise<void>((resolve) => {
     function loop() {
       setTimeout(() => {
-        let newDoc;
+        let newDoc: Document;
         try {
           newDoc = iframeWindow.document;
         } catch (err) {
@@ -655,10 +686,37 @@ function stopIframeLoading(iframeWindow: Window) {
         // wait for document ready
         if (!newDoc || newDoc == oldDoc) {
           loop();
-        } else {
-          iframeWindow.stop ? iframeWindow.stop() : iframeWindow.document.execCommand("Stop");
-          resolve();
+          return;
         }
+
+        // document ready, if is using ObjectURL, remove its "blob:" prefix
+        if (useObjectURL) {
+          const href = iframeWindow.location.href;
+          newDoc.open();
+          newDoc.close();
+
+          const deadline = Date.now() + 1e3;
+          const loop2 = function () {
+            if (Date.now() > deadline) {
+              // 一秒后 URL 没有变化
+              // 可能浏览器已经不支持使用这种奇技淫巧了，标记不再支持，并且回退到旧的方式加载
+              disableSandboxEmptyPageURL();
+              iframe.src = useObjectURL.mainHostPath;
+              stopIframeLoading(iframe, false).then(resolve);
+              return;
+            }
+
+            if (iframeWindow.location.href === href) setTimeout(loop2, 1);
+            else resolve();
+          };
+          loop2();
+
+          return;
+        }
+
+        // document ready
+        iframeWindow.stop ? iframeWindow.stop() : newDoc.execCommand("Stop");
+        resolve();
       }, 1);
     }
     loop();
@@ -807,6 +865,39 @@ export function renderIframeReplaceApp(
   renderElementToContainer(iframe, element);
 }
 
+const [getSandboxEmptyPageURL, disableSandboxEmptyPageURL] = (() => {
+  const disabledMarkKey = "wujie:disableSandboxEmptyPageURL";
+  let disabled = false;
+  try {
+    disabled = localStorage.getItem(disabledMarkKey) === "true";
+  } catch (e) {
+    // pass
+  }
+
+  if (disabled || typeof URL === "undefined" || typeof URL.createObjectURL !== "function")
+    return [() => "", () => void 0] as const;
+
+  let prevURL = "";
+  const getSandboxEmptyPageURL = () => {
+    if (disabled) return "";
+    if (prevURL) return prevURL;
+
+    const blob = new Blob(["<!DOCTYPE html><html><head></head><body></body></html>"], { type: "text/html" });
+    prevURL = URL.createObjectURL(blob);
+    return prevURL;
+  };
+
+  const disableSandboxEmptyPageURL = () => {
+    disabled = true;
+    try {
+      // TODO: 看能不能做上报，收集一下浏览器版本的情况
+      localStorage.setItem(disabledMarkKey, "true");
+    } catch (e) {}
+  };
+
+  return [getSandboxEmptyPageURL, disableSandboxEmptyPageURL];
+})();
+
 /**
  * js沙箱
  * 创建和主应用同源的iframe，路径携带了子路由的路由信息
@@ -819,15 +910,29 @@ export function iframeGenerator(
   appHostPath: string,
   appRoutePath: string
 ): HTMLIFrameElement {
+  let src = attrs && attrs.src;
+  let useObjectURL = false;
+  if (!src) {
+    src = getSandboxEmptyPageURL();
+    useObjectURL = !!src;
+    if (!src) src = mainHostPath; // fallback to mainHostPath
+  }
+
   const iframe = window.document.createElement("iframe");
-  const attrsMerge = { src: mainHostPath, style: "display: none", ...attrs, name: sandbox.id, [WUJIE_DATA_FLAG]: "" };
+  const attrsMerge = {
+    style: "display: none",
+    ...attrs,
+    src,
+    name: sandbox.id,
+    [WUJIE_DATA_FLAG]: "",
+  };
   setAttrsToElement(iframe, attrsMerge);
   window.document.body.appendChild(iframe);
 
   const iframeWindow = iframe.contentWindow;
   // 变量需要提前注入，在入口函数通过变量防止死循环
   patchIframeVariable(iframeWindow, sandbox, appHostPath);
-  sandbox.iframeReady = stopIframeLoading(iframeWindow).then(() => {
+  sandbox.iframeReady = stopIframeLoading(iframe, useObjectURL && { mainHostPath }).then(() => {
     if (!iframeWindow.__WUJIE) {
       patchIframeVariable(iframeWindow, sandbox, appHostPath);
     }

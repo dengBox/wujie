@@ -41,7 +41,14 @@ export function addSandboxCacheWithOptions(id: string, options: cacheOptions): v
 // 分类document上需要处理的属性，不同类型会进入不同的处理逻辑
 export const documentProxyProperties = {
   // 降级场景下需要本地特殊处理的属性
-  modifyLocalProperties: ["createElement", "createTextNode", "documentURI", "URL", "getElementsByTagName"],
+  modifyLocalProperties: [
+    "createElement",
+    "createTextNode",
+    "documentURI",
+    "URL",
+    "getElementsByTagName",
+    "getElementById",
+  ],
 
   // 子应用需要手动修正的属性方法
   modifyProperties: [
@@ -172,7 +179,7 @@ export const appWindowAddEventListenerEvents = [
 ];
 
 // 子应用window.onXXX需要挂载到iframe沙箱上的事件
-export const appWindowOnEvent = ["onload", "onbeforeunload", "onunload"];
+export const appWindowOnEvent = ["onload", "onbeforeunload", "onunload", "onerror", "onunhandledrejection"];
 
 // 相对路径问题元素的tag和attr的map
 export const relativeElementTagAttrMap = {

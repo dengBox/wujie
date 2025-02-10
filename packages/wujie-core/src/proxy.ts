@@ -71,7 +71,7 @@ export function proxyGenerator(
     },
 
     set: (target: Window, p: PropertyKey, value: any) => {
-      checkProxyFunction(value);
+      checkProxyFunction(target, value);
       target[p] = value;
       return true;
     },
@@ -310,6 +310,14 @@ export function localGenerator(
             return iframe.contentDocument.scripts as any;
           }
           return sandbox.document.getElementsByTagName(tagName) as any;
+        };
+      },
+    },
+    getElementById: {
+      get() {
+        return function (...args) {
+          const id = args[0];
+          return (sandbox.document.getElementById(id) as any) || iframe.contentDocument.getElementById(id);
         };
       },
     },
