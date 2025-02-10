@@ -815,7 +815,7 @@ export function insertScriptToIframe(
   nextScriptElement.textContent =
     "if(window.__WUJIE.execQueue && window.__WUJIE.execQueue.length){ window.__WUJIE.execQueue.shift()()}";
 
-  const container = rawDocumentQuerySelector.call(iframeWindow.document, "head");
+  const container = rawDocumentQuerySelector.call(iframeWindow.document, "body");
   const execNextScript = () => !async && container.appendChild(nextScriptElement);
   const afterExecScript = () => {
     onload?.();
