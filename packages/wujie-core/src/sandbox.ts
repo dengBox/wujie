@@ -87,6 +87,8 @@ export default class Wujie {
   public execQueue: Array<Function>;
   /** 子应用执行过标志 */
   public execFlag: boolean;
+  /** 子应用未激活时脚本插入顺序 */
+  public scriptInsertIndex: number;
   /** 子应用激活标志 */
   public activeFlag: boolean;
   /** 子应用mount标志 */
@@ -105,6 +107,7 @@ export default class Wujie {
   public document: Document;
   /** 子应用styleSheet元素 */
   public styleSheetElements: Array<HTMLLinkElement | HTMLStyleElement>;
+  public bodyElements: Array<HTMLDivElement | Element>;
   /** 子应用head元素 */
   public head: HTMLHeadElement;
   /** 子应用body元素 */
@@ -129,6 +132,7 @@ export default class Wujie {
     appEventObjMap: Map<String, EventObj>;
     mainHostPath: string;
   };
+  clearCatch: () => void;
 
   /** 激活子应用
    * 1、同步路由
@@ -249,9 +253,9 @@ export default class Wujie {
    * 2、处理兼容样式
    */
   public async start(getExternalScripts: () => ScriptResultList): Promise<void> {
-    this.execFlag = true;
+    this.scriptInsertIndex = -1;
     // 执行脚本
-    const scriptResultList = await getExternalScripts();
+    const scriptResultList = getExternalScripts();
     // 假如已经被销毁了
     if (!this.iframe) return;
     const iframeWindow = this.iframe.contentWindow;
@@ -338,6 +342,7 @@ export default class Wujie {
       this.execQueue.push(() => {
         resolve();
         this.execQueue.shift()?.();
+        this.execFlag = true;
       });
     });
   }
@@ -390,7 +395,7 @@ export default class Wujie {
   }
 
   /** 销毁子应用 */
-  public destroy() {
+  public destroy(disClear?: boolean) {
     this.unmount();
     this.bus.$clear();
     this.shadowRoot = null;
@@ -401,10 +406,12 @@ export default class Wujie {
     this.provide = null;
     this.degradeAttrs = null;
     this.styleSheetElements = null;
+    this.bodyElements = null;
     this.bus = null;
     this.replace = null;
     this.fetch = null;
     this.execFlag = null;
+    this.scriptInsertIndex = -1;
     this.mountFlag = null;
     this.hrefFlag = null;
     this.document = null;
@@ -425,6 +432,10 @@ export default class Wujie {
     // 清除 iframe 沙箱
     if (this.iframe) {
       const iframeWindow = this.iframe.contentWindow;
+      if (isFunction(iframeWindow.__WUJIE_DESTROY)) {
+        // 清除子系统运行时副作用
+        iframeWindow.__WUJIE_DESTROY();
+      }
       if (iframeWindow?.__WUJIE_EVENTLISTENER__) {
         iframeWindow.__WUJIE_EVENTLISTENER__.forEach((o) => {
           iframeWindow.removeEventListener(o.type, o.listener, o.options);
@@ -433,7 +444,9 @@ export default class Wujie {
       this.iframe.parentNode?.removeChild(this.iframe);
       this.iframe = null;
     }
-    deleteWujieById(this.id);
+    if (!disClear) {
+      deleteWujieById(this.id);
+    }
   }
 
   /** 当子应用再次激活后，只运行mount函数，样式需要重新恢复 */
@@ -441,6 +454,11 @@ export default class Wujie {
     if (this.styleSheetElements && this.styleSheetElements.length) {
       this.styleSheetElements.forEach((styleSheetElement) => {
         rawElementAppendChild.call(this.degrade ? this.document.head : this.shadowRoot.head, styleSheetElement);
+      });
+    }
+    if (this.bodyElements && this.bodyElements.length) {
+      this.bodyElements.forEach((domElement) => {
+        rawElementAppendChild.call(this.degrade ? this.document.body : this.shadowRoot.body, domElement);
       });
     }
     this.patchCssRules();
@@ -502,6 +520,7 @@ export default class Wujie {
     this.degradeAttrs = degradeAttrs;
     this.provide = { bus: this.bus };
     this.styleSheetElements = [];
+    this.bodyElements = [];
     this.execQueue = [];
     this.lifecycles = lifecycles;
     this.plugins = getPlugins(plugins);

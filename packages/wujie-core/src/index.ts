@@ -1,4 +1,4 @@
-import importHTML, { processCssLoader } from "./entry";
+import importHTML, { processCssLoader, styleCache, scriptCache, embedHTMLCache } from "./entry";
 import { StyleObject, ScriptAttributes } from "./template";
 import WuJie, { lifecycle } from "./sandbox";
 import { defineWujieWebComponent, addLoading } from "./shadow";
@@ -16,6 +16,12 @@ import {
 import { getWujieById, getOptionsById, addSandboxCacheWithOptions } from "./common";
 import { EventBus } from "./event";
 import { WUJIE_TIPS_NOT_SUPPORTED } from "./constant";
+
+export const clearAllCatch = () => {
+  Object.keys(styleCache).forEach((k) => delete styleCache[k]);
+  Object.keys(scriptCache).forEach((k) => delete scriptCache[k]);
+  Object.keys(embedHTMLCache).forEach((k) => delete embedHTMLCache[k]);
+};
 
 export const bus = new EventBus(Date.now().toString());
 
@@ -87,7 +93,14 @@ type eventListenerHook = (
   options?: boolean | AddEventListenerOptions
 ) => void;
 
-export type loadErrorHandler = (url: string, e: Error) => any;
+type errorParams = {
+  appWindow: Window;
+  url: string;
+  status?: number;
+  e: Error;
+};
+
+export type loadErrorHandler = (error: errorParams) => any;
 
 type baseOptions = {
   /** 唯一性用户必须保证 */
@@ -224,6 +237,7 @@ export async function startApp(startOptions: startOptions): Promise<Function | v
           url,
           html,
           opts: {
+            appWindow: sandbox.iframe.contentWindow,
             fetch: fetch || window.fetch,
             plugins: sandbox.plugins,
             loadError: sandbox.lifecycles.loadError,
@@ -251,7 +265,7 @@ export async function startApp(startOptions: startOptions): Promise<Function | v
       return sandbox.destroy;
     } else {
       // 没有渲染函数
-      sandbox.destroy();
+      sandbox.destroy(true);
     }
   }
 
@@ -263,12 +277,38 @@ export async function startApp(startOptions: startOptions): Promise<Function | v
     url,
     html,
     opts: {
+      appWindow: newSandbox.iframe.contentWindow,
       fetch: fetch || window.fetch,
       plugins: newSandbox.plugins,
       loadError: newSandbox.lifecycles.loadError,
       fiber,
     },
   });
+  // newSandbox.clearCatch = () => {
+  //   const currentScripts = getExternalScripts();
+  //   const currentStyles = getExternalStyleSheets();
+  //   // 清除html缓存
+  //   for (const h in embedHTMLCache) {
+  //     if (h === url) {
+  //       delete embedHTMLCache[h];
+  //       break;
+  //     }
+  //   }
+  //   // 清除js缓存
+  //   for (const j of currentScripts) {
+  //     const js = Object.keys(scriptCache).find((s) => s === j?.src);
+  //     if (js) {
+  //       delete scriptCache[j.src];
+  //     }
+  //   }
+  //   // 清除css缓存
+  //   for (const c of currentStyles) {
+  //     const css = Object.keys(styleCache).find((s) => s === c?.src);
+  //     if (css) {
+  //       delete styleCache[c.src];
+  //     }
+  //   }
+  // };
 
   const processedHtml = await processCssLoader(newSandbox, template, getExternalStyleSheets);
   await newSandbox.active({ url, sync, prefix, template: processedHtml, el, props, alive, fetch, replace });
@@ -315,6 +355,7 @@ export function preloadApp(preOptions: preOptions): void {
         url,
         html,
         opts: {
+          appWindow: sandbox.iframe.contentWindow,
           fetch: fetch || window.fetch,
           plugins: sandbox.plugins,
           loadError: sandbox.lifecycles.loadError,
@@ -326,7 +367,7 @@ export function preloadApp(preOptions: preOptions): void {
       if (exec) {
         await sandbox.start(getExternalScripts);
       } else {
-        await getExternalScripts();
+        getExternalScripts();
       }
     };
     sandbox.preload = runPreload();

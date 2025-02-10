@@ -1,6 +1,6 @@
 {
-  "name": "wujie",
-  "version": "1.0.24",
+  "name": "shsc-wujie",
+  "version": "1.0.23",
   "description": "极致的微前端框架",
   "main": "./lib/index.js",
   "module": "./esm/index.js",
@@ -19,15 +19,11 @@
     "test:unit": "jest -c __test__/unit/jest.config.js",
     "test:integration": "jest -c __test__/integration/jest.config.js --runInBand"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Tencent/wujie.git"
-  },
   "config": {
     "unsafe-perm": true,
     "registry": "https://registry.npmjs.org/"
   },
-  "author": "yiludege",
+  "author": "boshen",
   "license": "MIT",
   "devDependencies": {
     "@babel/cli": "^7.18.6",
